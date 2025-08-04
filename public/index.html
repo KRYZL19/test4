@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Online Fußball Pong</title>
+    <style>
+        /* Basic styling for the page */
+        body {
+            background-color: #1a1a1a; /* Dark background for focus */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            flex-direction: column;
+            overflow: hidden; /* Prevent scrolling on mobile */
+        }
+        /* Styling for the game canvas */
+        canvas {
+            background-color: #008000; 
+            border: 3px solid white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            max-width: 100%;
+            max-height: 100%;
+        }
+        #info {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 1.1em;
+            height: 50px; /* Reserve space to prevent layout shifts */
+        }
+        kbd {
+            background-color: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: monospace;
+        }
+
+        /* Lobby styles */
+        .lobby-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #2c2c2c;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+        .lobby-container input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: white;
+            font-size: 1em;
+        }
+        .lobby-container button {
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #008000;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .lobby-container button:hover {
+            background-color: #006400;
+        }
+        #waitingLobby p {
+            font-size: 1.2em;
+        }
+        #waitingLobby #waitingRoomId {
+            background-color: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #4CAF50;
+            cursor: pointer;
+        }
+        #lobbyError {
+            color: #ff4d4d;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        .hidden {
+            display: none !important;
+        }
+        /* NEU: Styles für die Raumliste */
+        #roomList {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+        }
+        #roomList li {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #roomList li:last-child {
+            border-bottom: none;
+        }
+        #roomList li:hover {
+            background-color: #008000;
+        }
+        #roomList li.full {
+            color: #888;
+            cursor: not-allowed;
+            background-color: #222;
+        }
+
+
+        /* Mobile controls */
+        #mobileControls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allow clicks to pass through */
+        }
+        .mobile-btn {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3em;
+            color: white;
+            pointer-events: auto; /* Make buttons clickable */
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10+ */
+            user-select: none; /* Standard syntax */
+        }
+        #btnUp {
+            bottom: 110px;
+            right: 20px;
+        }
+        #btnDown {
+            bottom: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="lobby" class="lobby-container">
+        <h2>Fußball Pong Online</h2>
+        <div id="lobbyError"></div>
+        <input type="text" id="roomNameInput" placeholder="Name für neuen Raum">
+        <button id="createRoomBtn">Neuen Raum erstellen</button>
+        <hr style="width:100%; border-color: #444;">
+        <h3>Verfügbare Räume:</h3>
+        <ul id="roomList">
+            </ul>
+    </div>
+
+    <div id="waitingLobby" class="lobby-container hidden">
+        <p>Warte auf Mitspieler...</p>
+        <p>Dein Raumname (teile ihn oder warte, bis jemand beitritt):</p>
+        <div id="waitingRoomId" title="Raumnamen kopieren"></div>
+        <button id="backToLobbyBtn">Zurück zur Lobby</button>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600" class="hidden"></canvas>
+    <div id="info" class="hidden"></div>
+
+    <div id="mobileControls" class="hidden">
+        <div id="btnUp" class="mobile-btn">↑</div>
+        <div id="btnDown" class="mobile-btn">↓</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const lobby = document.getElementById('lobby');
+            const waitingLobby = document.getElementById('waitingLobby');
+            const canvas = document.getElementById('gameCanvas');
+            const context = canvas.getContext('2d');
+            const infoDisplay = document.getElementById('info');
+            const mobileControls = document.getElementById('mobileControls');
+
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            const roomNameInput = document.getElementById('roomNameInput'); // GEÄNDERT
+            const waitingRoomIdDisplay = document.getElementById('waitingRoomId');
+            const lobbyError = document.getElementById('lobbyError');
+            const backToLobbyBtn = document.getElementById('backToLobbyBtn');
+            const roomList = document.getElementById('roomList'); // NEU
+
+            const btnUp = document.getElementById('btnUp');
+            const btnDown = document.getElementById('btnDown');
+            
+            const socket = io();
+            let playerNumber = 0;
+            let currentRoomId = null;
+            let localPlayerY = canvas.height / 2 - 50;
+            const paddleWidth = 15;
+            const paddleHeight = 100;
+            const keys = { w: false, s: false, ArrowUp: false, ArrowDown: false };
+
+            function showLobbyView() { // NEU: Funktion zum Anzeigen der Haupt-Lobby
+                lobby.classList.remove('hidden');
+                waitingLobby.classList.add('hidden');
+                canvas.classList.add('hidden');
+                infoDisplay.classList.add('hidden');
+                mobileControls.classList.add('hidden');
+                lobbyError.textContent = '';
+                currentRoomId = null;
+            }
+
+            function showWaitingLobbyView(roomId) { // NEU: Funktion für die Warte-Lobby
+                currentRoomId = roomId;
+                lobby.classList.add('hidden');
+                waitingLobby.classList.remove('hidden');
+                waitingRoomIdDisplay.textContent = roomId;
+            }
+            
+            function showGameView() {
+                lobby.classList.add('hidden');
+                waitingLobby.classList.add('hidden');
+                canvas.classList.remove('hidden');
+                infoDisplay.classList.remove('hidden');
+                mobileControls.classList.remove('hidden');
+            }
+
+            // --- Room Logic ---
+            createRoomBtn.addEventListener('click', () => {
+                const roomName = roomNameInput.value;
+                if (roomName) {
+                    lobbyError.textContent = '';
+                    socket.emit('createRoom', { roomId: roomName }); // GEÄNDERT: roomId statt password
+                } else {
+                    lobbyError.textContent = 'Bitte einen Namen für den Raum eingeben.';
+                }
+            });
+            
+            // GEÄNDERT: "joinRoomBtn" entfernt, Logik ist jetzt in updateRoomList
+
+            backToLobbyBtn.addEventListener('click', () => {
+                // GEÄNDERT: Server benachrichtigen, statt Seite neu zu laden
+                if (currentRoomId) {
+                    socket.emit('leaveRoom', { roomId: currentRoomId });
+                }
+            });
+
+            waitingRoomIdDisplay.addEventListener('click', () => {
+                navigator.clipboard.writeText(waitingRoomIdDisplay.textContent)
+                    .then(() => alert('Raumname kopiert!'))
+                    .catch(err => console.error('Fehler beim Kopieren: ', err));
+            });
+
+            socket.on('roomCreated', (data) => {
+                showWaitingLobbyView(data.roomId);
+            });
+
+            // NEU: Listener, um die Raumliste zu aktualisieren
+            socket.on('updateRoomList', (rooms) => {
+                roomList.innerHTML = ''; // Leere die aktuelle Liste
+                if (Object.keys(rooms).length === 0) {
+                     roomList.innerHTML = '<li>Aktuell keine Räume verfügbar.</li>';
+                } else {
+                    for (const roomId in rooms) {
+                        const room = rooms[roomId];
+                        const li = document.createElement('li');
+                        li.textContent = `${roomId} (${room.playerCount}/2)`;
+                        li.dataset.roomId = roomId; // Speichere die ID im Element
+
+                        if (room.playerCount >= 2) {
+                            li.classList.add('full');
+                        } else {
+                            li.addEventListener('click', () => {
+                                socket.emit('joinRoom', { roomId: roomId });
+                            });
+                        }
+                        roomList.appendChild(li);
+                    }
+                }
+            });
+
+            // NEU: Listener für die Rückkehr zur Lobby
+            socket.on('backToLobby', () => {
+                showLobbyView();
+            });
+
+            socket.on('roomError', (message) => {
+                lobbyError.textContent = message;
+            });
+
+            socket.on('startGame', (initialState) => {
+                showGameView();
+                draw(initialState); // Draw the very first frame
+            });
+
+            // --- Server Communication ---
+            socket.on('playerNumber', num => {
+                playerNumber = num;
+                // Wichtig: Dem Spieler seine Nummer zuweisen
+                socket.emit('setPlayerNumber', { number: playerNumber, roomId: currentRoomId });
+
+                if (playerNumber === 1) {
+                    infoDisplay.innerHTML = "Du bist Spieler 1 (Blau). Steuerung: <kbd>W</kbd> / <kbd>S</kbd>";
+                } else if (playerNumber === 2) {
+                    infoDisplay.innerHTML = "Du bist Spieler 2 (Rot). Steuerung: <kbd>↑</kbd> / <kbd>↓</kbd>";
+                }
+            });
+
+            socket.on('gameState', (state) => {
+                draw(state);
+            });
+            
+            socket.on('gameOver', (winner) => {
+                alert(winner + " hat das Spiel gewonnen!");
+                window.location.reload(); // Zurück zur Lobby nach Spielende
+            });
+
+            // --- Player Input Handling ---
+            document.addEventListener('keydown', (e) => { if (e.key in keys) keys[e.key] = true; });
+            document.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
+
+            // Mobile controls
+            btnUp.addEventListener('touchstart', (e) => { e.preventDefault(); (playerNumber === 1) ? keys.w = true : keys.ArrowUp = true; });
+            btnUp.addEventListener('touchend', (e) => { e.preventDefault(); (playerNumber === 1) ? keys.w = false : keys.ArrowUp = false; });
+            btnDown.addEventListener('touchstart', (e) => { e.preventDefault(); (playerNumber === 1) ? keys.s = true : keys.ArrowDown = true; });
+            btnDown.addEventListener('touchend', (e) => { e.preventDefault(); (playerNumber === 1) ? keys.s = false : keys.ArrowDown = false; });
+
+            function handleInput() {
+                if (playerNumber === 0 || !currentRoomId) return;
+
+                let moved = false;
+                if ((playerNumber === 1 && keys.w) || (playerNumber === 2 && keys.ArrowUp)) {
+                    if (localPlayerY > 0) { localPlayerY -= 8; moved = true; }
+                }
+                if ((playerNumber === 1 && keys.s) || (playerNumber === 2 && keys.ArrowDown)) {
+                    if (localPlayerY < canvas.height - paddleHeight) { localPlayerY += 8; moved = true; }
+                }
+
+                if (moved) {
+                    socket.emit('paddleMove', { y: localPlayerY, roomId: currentRoomId });
+                }
+            }
+
+            // --- Drawing Functions ---
+            function draw(state) {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                drawPitch();
+                if (state.ball) drawBall(state.ball);
+                if (state.players) drawPlayersAndScores(state.players);
+            }
+            
+            function drawPitch() {
+                context.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                context.lineWidth = 4;
+                context.beginPath();
+                context.moveTo(canvas.width / 2, 0);
+                context.lineTo(canvas.width / 2, canvas.height);
+                context.stroke();
+                context.beginPath();
+                context.arc(canvas.width / 2, canvas.height / 2, 70, 0, Math.PI * 2, false);
+                context.stroke();
+            }
+
+            function drawBall(ball) {
+                context.beginPath();
+                context.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                context.fillStyle = 'white';
+                context.fill();
+                context.strokeStyle = 'black';
+                context.lineWidth = 2;
+                context.stroke();
+                context.closePath();
+            }
+            
+            function drawPlayersAndScores(players) {
+                context.font = '50px sans-serif';
+                context.textAlign = 'center';
+                
+                for(const id in players) {
+                    const player = players[id];
+                    if (player.number === 1) {
+                        context.fillStyle = '#0000FF';
+                        context.fillRect(10, player.y, paddleWidth, paddleHeight);
+                        context.fillStyle = 'white';
+                        context.fillText(player.score, canvas.width / 4, 60);
+                    } else if (player.number === 2) {
+                        context.fillStyle = '#FF0000';
+                        context.fillRect(canvas.width - paddleWidth - 10, player.y, paddleWidth, paddleHeight);
+                        context.fillStyle = 'white';
+                        context.fillText(player.score, 3 * canvas.width / 4, 60);
+                    }
+                }
+            }
+
+            // --- Client-Side Game Loop ---
+            function loop() {
+                handleInput();
+                requestAnimationFrame(loop);
+            }
+            loop();
+        });
+    </script>
+</body>
+</html>
