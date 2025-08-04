@@ -1,0 +1,105 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+    padding: 20px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #333;
+}
+
+.game-area {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+}
+
+.player-container {
+    text-align: center;
+}
+
+.bingo-board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px; /* Abstand zwischen den Feldern vergrößert */
+    width: 350px; /* Breite des Feldes angepasst */
+    height: 350px; /* Höhe des Feldes angepasst */
+    margin: 10px auto;
+}
+
+.bingo-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Knopf-Styling */
+    background-color: #e9ecef;
+    border: none;
+    font-size: 1.5em; /* Schriftgröße vergrößert */
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 8px; /* Runde Ecken */
+    transition: background-color 0.2s, transform 0.1s; /* Sanfte Übergänge */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Leichter Schatten */
+}
+
+/* Hover-Effekt */
+.bingo-cell:hover {
+    background-color: #dee2e6; /* Hellerer Hintergrund beim Hover */
+    transform: translateY(-2px); /* Knopf schwebt leicht nach oben */
+}
+
+.bingo-cell.marked {
+    background-color: #4CAF50; /* Grün */
+    color: white;
+    transform: none; /* Kein Hover-Effekt, wenn markiert */
+    cursor: default;
+}
+
+.bingo-cell.marked:hover {
+    background-color: #4CAF50;
+}
+
+#drawn-numbers-container {
+    margin-bottom: 20px;
+}
+
+#current-drawn-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #d9534f;
+}
+
+#reset-button {
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+#reset-button:hover {
+    background-color: #0056b3;
+}
+
+#winner-display {
+    margin-top: 20px;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #28a745;
+}

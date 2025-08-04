@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Bingo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Online Bingo</h1>
+
+        <div id="lobby" class="section">
+            <h2>Spielen</h2>
+            <input type="text" id="roomIdInput" placeholder="Raum-ID eingeben">
+            <button id="createRoomBtn">Raum erstellen</button>
+            <button id="joinRoomBtn">Raum beitreten</button>
+            <p id="error-message"></p>
+        </div>
+
+        <div id="game" class="section hidden">
+            <h2 id="player-status"></h2>
+            <div id="drawn-numbers-container">
+                <p>Gezogene Zahl: <span id="current-drawn-number">?</span></p>
+                <p>Bisher gezogene Zahlen: <span id="drawn-numbers-list"></span></p>
+            </div>
+            
+            <div id="bingo-board" class="bingo-board"></div>
+
+            <div id="winner-display"></div>
+            <button id="reset-button" style="display: none;">Neues Spiel</button>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
